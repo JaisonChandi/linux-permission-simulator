@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Permission Lab: Linux file access simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef2f5;--panel:#fff;--ink:#17212b;--mute:#5d6b79;--line:#d5dde5;--o:#2f6fde;--g:#c77d00;--t:#8a4fd6;--r:#555;--ok:#15845a;--no:#c93a32;--okbg:#e2f5ec;--nobg:#fbe5e3;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#12181e;--panel:#1b232b;--ink:#e6edf3;--mute:#93a1af;--line:#2c3743;--o:#6ea0ff;--g:#f0b24a;--t:#b992f0;--r:#aab;--ok:#4cc78f;--no:#ff7b72;--okbg:#14302a;--nobg:#3a1d1d}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#12181e;--panel:#1b232b;--ink:#e6edf3;--mute:#93a1af;--line:#2c3743;--o:#6ea0ff;--g:#f0b24a;--t:#b992f0;--r:#aab;--ok:#4cc78f;--no:#ff7b72;--okbg:#14302a;--nobg:#3a1d1d}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "IBM Plex Sans",system-ui,sans-serif}
+.mono,.mono *{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace}
+.wrap{max-width:1240px;margin:0 auto;padding:18px 16px 40px}
+h1{font-size:26px;margin:0 0 2px;letter-spacing:-.3px}h2{font-size:15px;margin:0 0 10px}
+.sub{color:var(--mute);margin:0 0 14px}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+.chip{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:6px 14px;cursor:pointer;font:inherit}
+.chip[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip small{opacity:.7;margin-left:4px}
+.grid{display:grid;grid-template-columns:270px 1fr 1fr;gap:14px;align-items:start}
+@media(max-width:1000px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;min-width:0}
+.row{display:flex;gap:8px;align-items:center;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap}
+.row:hover{background:var(--bg)}.row.sel{background:var(--bg);outline:2px solid var(--ink)}
+.row .nm{flex:1;overflow:hidden;text-overflow:ellipsis}
+.o{color:var(--o)}.g{color:var(--g)}.t{color:var(--t)}.rt{color:var(--r)}
+.ls{font-size:15px;padding:10px;background:var(--bg);border-radius:8px;overflow-x:auto;white-space:nowrap;margin-bottom:12px}
+.cols{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.col{border-top:4px solid;padding-top:6px;text-align:center}
+.col.o{border-color:var(--o)}.col.g{border-color:var(--g)}.col.t{border-color:var(--t)}
+.col b{display:block;font-size:13px}
+.bits{display:flex;gap:4px;justify-content:center;margin-top:6px}
+.bit{width:36px;height:36px;border-radius:6px;border:2px solid currentColor;background:transparent;color:inherit;font:600 15px "IBM Plex Mono",monospace;cursor:pointer;opacity:.45}
+.bit[aria-pressed=true]{background:currentColor;opacity:1}.bit[aria-pressed=true] span{color:var(--panel)}
+.oct{display:flex;gap:14px;align-items:baseline;margin:6px 0 12px;flex-wrap:wrap}.oct b{font-size:30px;letter-spacing:4px}
+select{font:inherit;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 6px}
+table{border-collapse:collapse;width:100%;font-size:13px}td,th{padding:5px 6px;border-bottom:1px solid var(--line);text-align:center}th:first-child,td:first-child{text-align:left}
+.yes{color:var(--ok);font-weight:600}.nop{color:var(--no);font-weight:600}
+.tag{font-size:11px;border-radius:4px;padding:1px 6px;border:1px solid currentColor;margin-left:4px}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.btn{background:var(--ink);color:var(--bg);border:0;border-radius:8px;padding:8px 14px;font:600 14px inherit;font-family:inherit;cursor:pointer}
+.btn:focus-visible,.chip:focus-visible,.bit:focus-visible,.row:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--o);outline-offset:2px}
+.step{border-left:5px solid var(--line);background:var(--bg);border-radius:6px;padding:8px 10px;margin-bottom:8px;font-size:13px;animation:in .3s}
+@keyframes in{from{opacity:0;transform:translateX(-6px)}}
+@media(prefers-reduced-motion:reduce){.step{animation:none}}
+.step.owner{border-color:var(--o)}.step.group{border-color:var(--g)}.step.other{border-color:var(--t)}.step.root{border-color:var(--no)}
+.step .h{display:flex;justify-content:space-between;gap:8px;font-weight:600}
+.step ul{margin:6px 0;padding-left:18px;color:var(--mute)}.step li.hit{color:var(--ink);font-weight:600}
+.need{background:var(--ink);color:var(--bg);border-radius:3px;padding:0 3px}
+.res{font-weight:600}.res.ok{color:var(--ok)}.res.no{color:var(--no)}
+.verdict{border-radius:8px;padding:10px 12px;font-weight:600;animation:in .3s}.verdict.ok{background:var(--okbg);color:var(--ok)}.verdict.no{background:var(--nobg);color:var(--no)}
+.empty{color:var(--mute);font-size:13px}
+.term{margin-top:14px}.out{background:#0f161c;color:#d6e2ee;border-radius:8px;padding:10px;height:190px;overflow:auto;font-size:13px;white-space:pre-wrap}
+.out .e{color:#ff8f87}.out .k{color:#6fdca8}.out .c{color:#7fb0ff}
+.in{display:flex;gap:8px;margin-top:8px}.in input{flex:1;font:14px "IBM Plex Mono",monospace;padding:8px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+.legend{font-size:12.5px;color:var(--mute);margin-top:10px}
+</style></head><body><div class="wrap">
+<h1>Permission Lab</h1>
+<p class="sub">A Linux file permission and access control simulator. Pick who you are, pick a file, and watch the kernel decide.</p>
+<div class="bar" id="users" role="group" aria-label="Acting as"></div>
+<div class="grid">
+ <section class="panel"><h2>File system</h2><div id="tree"></div>
+  <p class="legend"><span class="o">Owner</span> / <span class="g">Group</span> / <span class="t">Others</span> bits are colored the same everywhere.</p></section>
+ <section class="panel"><h2>Inspector</h2><div id="insp"></div></section>
+ <section class="panel"><h2>Access check</h2>
+  <div class="acts"><button class="btn" data-a="4">Read</button><button class="btn" data-a="2">Write</button><button class="btn" data-a="1">Execute</button></div>
+  <div id="trace"><p class="empty">Choose an action. The kernel first needs <b>x</b> on every parent directory, then checks the file itself. It uses the <b>first matching class only</b>: owner, else group, else others.</p></div></section>
+</div>
+<section class="panel term"><h2>Terminal <span class="empty">try: help</span></h2>
+ <div class="out mono" id="out" aria-live="polite"></div>
+ <div class="in"><input id="cmd" class="mono" placeholder="chmod 640 notes.txt" aria-label="Command" autocomplete="off" spellcheck="false"><button class="btn" id="go">Run</button></div></section>
+</div>
+<script>
+const $=s=>document.querySelector(s);
+const U={root:['root'],alice:['dev'],bob:['dev'],carol:['staff']},G=['root','dev','staff'];
+let fs=[['/','root','root',0o755,'d'],['/home','root','root',0o755,'d'],['/home/alice','alice','dev',0o750,'d'],['/home/alice/notes.txt','alice','dev',0o640,'-'],['/home/alice/backup.sh','alice','dev',0o750,'-'],['/shared','bob','dev',0o770,'d'],['/shared/report.pdf','bob','dev',0o664,'-'],['/etc','root','root',0o755,'d'],['/etc/shadow','root','root',0o600,'-']].map(([p,o,g,m,t])=>({p,o,g,m,t}));
+let me='alice',sel='/home/alice/notes.txt',tk=0;
+const NAME={4:'Read',2:'Write',1:'Execute'},LET={4:'r',2:'w',1:'x'},SH={owner:6,group:3,other:0},CL={owner:'o',group:'g',other:'t',root:'rt'};
+const node=p=>fs.find(n=>n.p===p),base=p=>p==='/'?'/':p.split('/').pop();
+const tri=(v,need)=>'rwx'.split('').map((c,i)=>(v>>(2-i)&1)?(need&&LET[need]===c?`<span class="need">${c}</span>`:c):'-').join('');
+const seg=(m,t)=>`${t}<span class="o">${tri(m>>6&7)}</span><span class="g">${tri(m>>3&7)}</span><span class="t">${tri(m&7)}</span>`;
+const bitsOf=(n,c)=>c==='root'?7:n.m>>SH[c]&7;
+function decide(u,n,b){const L=[];let c,ok;
+ if(u==='root'){c='root';L.push(['uid 0 is the superuser: read/write checks are bypassed','hit']);ok=b!==1||n.t==='d'||(n.m&73)>0;if(!ok)L.push(['but execute on a regular file still needs at least one x bit','hit'])}
+ else{const own=n.o===u;L.push([`Is ${u} the owner? Owner is ${n.o}: ${own?'yes':'no'}`,own?'hit':'skip']);
+  if(own)c='owner';else{const gm=U[u].includes(n.g);L.push([`Is ${u} in group ${n.g}? ${u} is in ${U[u].join(', ')}: ${gm?'yes':'no'}`,gm?'hit':'skip']);c=gm?'group':'other';
+   if(!gm)L.push(['Not owner, not in group: the others bits apply','hit'])}
+  ok=(bitsOf(n,c)&b)>0}
+ return{c,ok,b,L,v:bitsOf(n,c)}}
+function plan(p,b){const parts=p.split('/').filter(Boolean),ch=['/'];let a='';parts.slice(0,-1).forEach(x=>{a+='/'+x;ch.push(a)});
+ const st=ch.map(q=>({q,b:1,dir:1}));st.push({q:p,b});const res=[];let ok=true;
+ for(const s of st){const d=decide(me,node(s.q),s.b);res.push({s,d});if(!d.ok){ok=false;break}}return{res,ok}}
+function card({s,d}){const n=node(s.q);
+ return`<div class="step ${d.c}"><div class="h"><span>${s.dir?'Enter directory':NAME[s.b]+' file'} <span class="mono">${s.q}</span></span><span>needs <b class="mono">${LET[s.b]}</b></span></div>
+ <ul>${d.L.map(([t,k])=>`<li class="${k}">${t}</li>`).join('')}</ul>
+ <div class="mono">${d.c==='root'?'root: bits bypassed':`${d.c} bits: ${tri(d.v,s.b)}`} <span class="res ${d.ok?'ok':'no'}">${d.ok?'allowed':'blocked'}</span></div></div>`}
+function runCheck(b,p){p=p||sel;const my=++tk,{res,ok}=plan(p,b),out=$('#trace');out.innerHTML='';
+ res.forEach((r,i)=>setTimeout(()=>{if(my!==tk)return;out.insertAdjacentHTML('beforeend',card(r));
+  if(i===res.length-1){const l=r.s,d=r.d;out.insertAdjacentHTML('beforeend',`<div class="verdict ok-${ok}"></div>`);const v=out.lastElementChild;v.className='verdict '+(ok?'ok':'no');
+  v.textContent=ok?`GRANTED: ${me} can ${NAME[b].toLowerCase()} ${p}`:`DENIED at ${l.q}: ${d.c} bits lack ${LET[l.b]}`}},i*600));return ok}
+function who(n){return`<table><tr><th>User</th><th>read</th><th>write</th><th>exec</th></tr>`+Object.keys(U).map(u=>{const c=decide(u,n,1).c;
+ return`<tr><td>${u}<span class="tag ${CL[c]}">${c}</span></td>`+[4,2,1].map(b=>{const sv=me;me=u;const ok=plan(n.p,b).ok;me=sv;return`<td class="${ok?'yes':'nop'}">${ok?'✓':'✗'}</td>`}).join('')+'</tr>'}).join('')+'</table>'}
+function render(){
+ $('#users').innerHTML='<span>Acting as</span>'+Object.keys(U).map(u=>`<button class="chip" aria-pressed="${u===me}" data-u="${u}">${u}<small>${U[u].join(',')}</small></button>`).join('');
+ $('#tree').innerHTML=fs.map(n=>`<div class="row mono${n.p===sel?' sel':''}" tabindex="0" data-p="${n.p}" style="padding-left:${6+12*(n.p.split('/').length-(n.p==='/'?2:1))}px"><span>${n.t==='d'?'▸':'·'}</span><span class="nm">${base(n.p)}</span><span>${seg(n.m,n.t)}</span></div>`).join('');
+ const n=node(sel),sd=n.m>>6&7,sg=n.m>>3&7,so=n.m&7,can=me==='root'||n.o===me;
+ $('#insp').innerHTML=`<div class="ls mono">${seg(n.m,n.t)}  <span class="o">${n.o}</span> <span class="g">${n.g}</span>  ${n.p}</div>
+ <div class="cols">${[['o','Owner',6],['g','Group',3],['t','Others',0]].map(([k,l,s])=>`<div class="col ${k}"><b>${l}</b><div class="bits ${k}">${[4,2,1].map(b=>`<button class="bit" aria-pressed="${!!(n.m>>s&b)}" aria-label="${l} ${NAME[b]}" data-s="${s}" data-b="${b}"><span>${LET[b]}</span></button>`).join('')}</div></div>`).join('')}</div>
+ <div class="oct mono"><b><span class="o">${sd}</span><span class="g">${sg}</span><span class="t">${so}</span></b><span class="empty">r=4 w=2 x=1, added up per class</span></div>
+ <p style="margin:0 0 12px;font-size:13px">Owner <select id="so">${Object.keys(U).map(u=>`<option${u===n.o?' selected':''}>${u}</option>`).join('')}</select> Group <select id="sg">${G.map(g=>`<option${g===n.g?' selected':''}>${g}</option>`).join('')}</select></p>
+ <p class="empty" style="margin:0 0 8px">${can?`${me} may change this file.`:`${me} is not the owner, so chmod and chown will be refused.`} Who can do what (including parent directories):</p>${who(n)}`}
+const log=(h)=>{const o=$('#out');o.insertAdjacentHTML('beforeend',h+'\n');o.scrollTop=o.scrollHeight};
+const esc=s=>s.replace(/</g,'&lt;');
+function pm(s,cur){if(/^[0-7]{3}$/.test(s))return parseInt(s,8);const r=s.match(/^([ugoa]*)([-+=])([rwx]*)$/);if(!r)return null;
+ let w=r[1]||'a';if(w.includes('a'))w='ugo';let v=0;for(const c of r[3])v|={r:4,w:2,x:1}[c];let m=cur;
+ for(const c of w){const sh={u:6,g:3,o:0}[c],b=v<<sh;if(r[2]==='+')m|=b;else if(r[2]==='-')m&=~b;else m=(m&~(7<<sh))|b}return m&511}
+function chmod(n,m){if(me!=='root'&&n.o!==me)return log(`<span class="e">chmod: changing permissions of '${n.p}': Operation not permitted (${me} is not the owner)</span>`),0;
+ n.m=m;log(`<span class="k">mode of ${n.p} is now ${m.toString(8)} (${sym(n)})</span>`);render();return 1}
+const sym=n=>seg(n.m,n.t).replace(/<[^>]+>/g,'');
+function chown(n,o,g){const okg=U[me]&&U[me].includes(g);if(me!=='root'&&(o!==n.o||!(n.o===me&&okg))){log(`<span class="e">chown: changing ownership of '${n.p}': Operation not permitted</span>`);return 0}
+ n.o=o;n.g=g;log(`<span class="k">owner of ${n.p} is now ${o}:${g}</span>`);render();return 1}
+const rp=x=>!x?node(sel):x[0]==='/'?node(x):fs.find(n=>base(n.p)===x);
+function cmd(line){const a=line.trim().split(/\s+/);if(!a[0])return;log(`<span class="c">${me}@lab:~$ ${esc(line)}</span>`);const c=a[0];
+ if(c==='help')log('ls -l | id | chmod MODE [file] | chown user[:group] [file]\ncat FILE | edit FILE | exec FILE   (runs an access check)\nsu USER   (switch user)\nMODE: 640 or u+x, g-w, o=r, a+r ...');
+ else if(c==='ls')fs.forEach(n=>log(`${sym(n)}  ${n.o} ${n.g}  ${n.p}`));
+ else if(c==='id')log(`uid=${me} groups=${U[me].join(',')}`);
+ else if(c==='su'&&U[a[1]]){me=a[1];tk++;$('#trace').innerHTML='';render()}
+ else if(c==='chmod'){const n=rp(a[2]),m=n&&a[1]&&pm(a[1],n.m);if(!n)log('<span class="e">chmod: no such file</span>');else if(m===null||m===undefined||a[1]==null)log('<span class="e">chmod: invalid mode</span>');else{sel=n.p;chmod(n,m)}}
+ else if(c==='chown'){const n=rp(a[2]),[o,g]=(a[1]||'').split(':');if(!n||!U[o])log('<span class="e">chown: invalid user or file</span>');else if(g&&!G.includes(g))log('<span class="e">chown: invalid group</span>');else{sel=n.p;chown(n,o,g||n.g)}}
+ else if(['cat','edit','exec'].includes(c)){const n=rp(a[1]);if(!n)return log('<span class="e">no such file</span>');sel=n.p;render();const ok=runCheck({cat:4,edit:2,exec:1}[c],n.p);
+  log(ok?`<span class="k">${c}: ${n.p}: access granted</span>`:`<span class="e">${c}: ${n.p}: Permission denied</span>`)}
+ else log(`<span class="e">${esc(c)}: command not found (try help)</span>`)}
+document.addEventListener('click',e=>{const t=e.target.closest('[data-u],[data-p],[data-a],.bit,#go');if(!t)return;
+ if(t.dataset.u){me=t.dataset.u;tk++;$('#trace').innerHTML='';render()}
+ else if(t.dataset.p){sel=t.dataset.p;tk++;$('#trace').innerHTML='';render()}
+ else if(t.dataset.a)runCheck(+t.dataset.a);
+ else if(t.classList.contains('bit')){const n=node(sel);chmod(n,n.m^(t.dataset.b<<t.dataset.s))}
+ else if(t.id==='go'){cmd($('#cmd').value);$('#cmd').value=''}});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='cmd'){cmd(e.target.value);e.target.value=''}else if(e.key==='Enter'&&e.target.dataset&&e.target.dataset.p)e.target.click()});
+document.addEventListener('change',e=>{const n=node(sel);if(e.target.id==='so'||e.target.id==='sg'){if(!chown(n,$('#so').value,$('#sg').value))render()}});
+render();log('Welcome to Permission Lab. Type help for commands.');
+</script></body></html>
